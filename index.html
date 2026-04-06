@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T1D Human-Controlled Insulin Demo</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --panel: #ffffff;
+      --muted: #64748b;
+      --text: #0f172a;
+      --border: #dbe3ef;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.10);
+      --good: rgba(34, 197, 94, 0.14);
+      --warn: #dc2626;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(37,99,235,0.10), transparent 35%),
+        radial-gradient(circle at top right, rgba(14,165,233,0.08), transparent 25%),
+        var(--bg);
+    }
+
+    .page {
+      max-width: 1520px;
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 0;
+      flex-shrink: 0;
+    }
+
+    .hero h1 {
+      margin: 0 0 4px 0;
+      font-size: clamp(1.55rem, 2.3vw, 2.2rem);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 900px;
+      line-height: 1.35;
+      font-size: 0.91rem;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--border);
+      font-size: 0.87rem;
+      color: var(--muted);
+      box-shadow: var(--shadow);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.9fr) minmax(300px, 0.9fr);
+      gap: 16px;
+      align-items: stretch;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(219, 227, 239, 0.9);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-height: 0;
+    }
+
+    .charts-panel {
+      padding: 12px;
+      min-height: 0;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-rows: 1.5fr 0.82fr 0.82fr;
+      gap: 10px;
+      height: min(74vh, calc(100vh - 150px));
+      min-height: 540px;
+    }
+
+    .chart-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+      padding: 10px 12px 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .chart-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .chart-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .chart-subtitle {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.2;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: block;
+      border-radius: 12px;
+      background: #ffffff;
+      flex: 1;
+    }
+
+    .controls-panel {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      position: sticky;
+      top: 14px;
+      max-height: calc(100vh - 28px);
+      overflow: auto;
+    }
+
+    .section {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+    }
+
+    .section h2 {
+      margin: 0 0 10px 0;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+    }
+
+    .section p {
+      margin: 6px 0 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    select,
+    input[type="range"],
+    button {
+      width: 100%;
+    }
+
+    select,
+    input[type="number"],
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      font: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .range-value {
+      min-width: 86px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.92rem;
+      color: #1e293b;
+      font-weight: 700;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 10px 22px rgba(37, 99, 235, 0.25);
+    }
+
+    button.secondary {
+      background: #e8eefc;
+      color: #1d4ed8;
+    }
+
+    button.ghost {
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid var(--border);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.85;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric {
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 12px;
+    }
+
+    .metric-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .patient-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .mini {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fbfdff;
+    }
+
+    .mini .k {
+      color: var(--muted);
+      font-size: 0.76rem;
+      margin-bottom: 4px;
+    }
+
+    .mini .v {
+      font-weight: 800;
+      font-size: 0.98rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-top: 4px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .events {
+      display: grid;
+      gap: 8px;
+      max-height: 150px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .event {
+      border-left: 3px solid #bfdbfe;
+      padding: 8px 10px;
+      background: #f8fbff;
+      border-radius: 0 10px 10px 0;
+      font-size: 0.87rem;
+      color: #334155;
+      line-height: 1.4;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 0.83rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1180px) {
+      .page {
+        min-height: auto;
+      }
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .charts-grid {
+        height: auto;
+        min-height: 640px;
+      }
+      .controls-panel {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page { padding: 12px; }
+      .button-row,
+      .metrics,
+      .patient-meta { grid-template-columns: 1fr; }
+      .charts-grid {
+        height: auto;
+        min-height: 620px;
+      }
+      .hero { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="hero">
+      <div>
+        <h1>T1D Human-Controlled Insulin Demo</h1>
+        <p>
+          A single-file browser demo that mirrors the 13-state simglucose-style patient model, lets you manually control basal insulin,
+          and loads virtual patients from the simglucose repository at runtime when available.
+        </p>
+        <div class="badge-row">
+          <div class="badge">Single HTML file</div>
+          <div class="badge">Repo-backed patient dropdown</div>
+          <div class="badge">RK4 dynamics at 1 min timestep</div>
+          <div class="badge">Local fallback snapshot included</div>
+        </div>
+      </div>
+      <div class="status-pill" id="dataSourcePill"><span class="status-dot"></span><span id="dataSourceText">Loading patient data…</span></div>
+    </div>
+
+    <div class="layout">
+      <div class="panel charts-panel">
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-top">
+              <div>
+                <div class="chart-title">Glucose trace</div>
+                <div class="chart-subtitle">Safe range shaded between 70 and 180 mg/dL</div>
+              </div>
+              <div class="chart-subtitle" id="timeWindowLabel">Window: 360 min</div>
+            </div>
+            <canvas id="glucoseCanvas"></canvas>
+            <div class="legend">
+              <span><i class="swatch" style="background:#2563eb"></i>Glucose</span>
+              <span><i class="swatch" style="background:rgba(34,197,94,0.18); border:1px solid rgba(34,197,94,0.45)"></i>Target range</span>
+              <span><i class="swatch" style="background:#111827"></i>Target line</span>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-top">
+              <div>
+                <div class="chart-title">Insulin control</div>
+                <div class="chart-subtitle">Human-controlled basal insulin rate</div>
+              </div>
+              <div class="chart-subtitle" id="insulinMaxLabel">Max: 0.50 U/min</div>
+            </div>
+            <canvas id="insulinCanvas"></canvas>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-top">
+              <div>
+                <div class="chart-title">Meal intake</div>
+                <div class="chart-subtitle">Scheduled carbohydrate consumption from the demo config</div>
+              </div>
+              <div class="chart-subtitle" id="mealCountLabel">6 scheduled meals</div>
+            </div>
+            <canvas id="mealCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel controls-panel">
+        <div class="section">
+          <h2>Patient and simulation</h2>
+          <div class="form-grid">
+            <div>
+              <label for="patientSelect">Virtual patient</label>
+              <select id="patientSelect"></select>
+            </div>
+            <div class="button-row">
+              <button id="startPauseBtn" class="primary">Start</button>
+              <button id="resetBtn" class="secondary">Reset</button>
+              <button id="reloadRepoBtn" class="ghost">Reload repo</button>
+            </div>
+            <p id="repoStatusText">Trying to read patient definitions from the simglucose repository…</p>
+          </div>
+
+          <div class="patient-meta">
+            <div class="mini"><div class="k">Body weight</div><div class="v" id="bwValue">—</div></div>
+            <div class="mini"><div class="k">Basal steady insulin</div><div class="v" id="u2ssValue">—</div></div>
+            <div class="mini"><div class="k">Glucose volume</div><div class="v" id="vgValue">—</div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Control panel</h2>
+          <div>
+            <label for="insulinSlider">Insulin rate</label>
+            <div class="range-row">
+              <input id="insulinSlider" type="range" min="0" max="0.5" step="0.01" value="0" />
+              <div class="range-value" id="insulinValue">0.000 U/min</div>
+            </div>
+          </div>
+          <div style="margin-top: 12px;">
+            <label for="speedSlider">Playback speed</label>
+            <div class="range-row">
+              <input id="speedSlider" type="range" min="1" max="240" step="1" value="30" />
+              <div class="range-value" id="speedValue">30×</div>
+            </div>
+          </div>
+          <p>Keyboard shortcuts: ↑ / → increase insulin, ↓ / ← decrease insulin, space pause or resume, R reset.</p>
+        </div>
+
+        <div class="section">
+          <h2>Live metrics</h2>
+          <div class="metrics">
+            <div class="metric"><div class="metric-label">Status</div><div class="metric-value" id="statusValue">Paused</div></div>
+            <div class="metric"><div class="metric-label">Simulation time</div><div class="metric-value" id="timeValue">0.0 min</div></div>
+            <div class="metric"><div class="metric-label">Glucose</div><div class="metric-value" id="glucoseValue">—</div></div>
+            <div class="metric"><div class="metric-label">Time remaining</div><div class="metric-value" id="remainingValue">—</div></div>
+            <div class="metric"><div class="metric-label">Target</div><div class="metric-value" id="targetValue">—</div></div>
+            <div class="metric"><div class="metric-label">Pending CHO</div><div class="metric-value" id="pendingChoValue">—</div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Recent events</h2>
+          <div class="events" id="eventsList"></div>
+        </div>
+
+        <div class="section">
+          <h2>Notes</h2>
+          <div class="footer-note">
+            The patient dropdown is built from simglucose patient rows. The meal schedule, plotting ranges, target glucose, and demo-level UI defaults come from your provided converted config.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const REPO_CSV_URL = 'https://raw.githubusercontent.com/jxx123/simglucose/master/simglucose/params/vpatient_params.csv';
+    const FALLBACK_CSV = "Name,i,x0_ 1,x0_ 2,x0_ 3,x0_ 4,x0_ 5,x0_ 6,x0_ 7,x0_ 8,x0_ 9,x0_10,x0_11,x0_12,x0_13,BW,EGPb,Gb,Ib,kabs,kmax,kmin,b,d,Vg,Vi,Ipb,Vmx,Km0,k2,k1,p2u,m1,m5,CL,HEb,m2,m4,m30,Ilb,ki,kp2,kp3,f,Gpb,ke1,ke2,Fsnc,Gtb,Vm0,Rdb,PCRb,kd,ksc,ka1,ka2,dosekempt,u2ss,isc1ss,isc2ss,kp1,patient_history\nadolescent#001,1,0,0,0,250.621836,176.506559902,4.697517762,0,97.554,97.554,3.19814917262,57.951224472,93.2258828462,250.621836,68.706,3.3924,149.02,97.554,0.091043,0.015865,0.0083338,0.83072,0.32294,1.6818,0.048153,4.697517762,0.074667,260.89,0.067738,0.057252,0.021344,0.15221,0.029902,0.8571,0.6,0.259067825939,0.103627130376,0.228315,3.19814917262,0.0088838,0.023318,0.023253,0.9,250.621836,0.0005,339,1,176.506559902,5.92854753098,3.3924,0.0227647295665,0.0185,0.056,0.0025,0.0115,90000,1.21697571391,57.951224472,93.2258828462,11.5048231338,0\nadolescent#002,2,0,0,0,280.236267,30.9541309204,6.01930508,0,119.18,119.18,4.96870842374,77.8484760287,47.1721248798,280.236267,51.046,2.4905,152.41,119.18,0.12473,0.034573,0.006983,0.76876,0.18887,1.8387,0.050506,6.01930508,0.038897,223.01,0.28643,0.036957,0.017681,0.14477,0.036533,0.77023,0.6,0.298755383281,0.119502153313,0.217155,4.96870842374,0.0084603,0.0026879,0.0079949,0.9,280.236267,0.0005,339,1,30.9541309204,12.228853658,2.4905,0.0163407912867,0.0163,0.1314,0.0068,0.0269,90000,1.79829979626,77.8484760287,47.1721248798,4.19657924407,0\nadolescent#003,3,0,0,0,326.55338,383.368339011,3.48788064,0,101.28,101.28,5.27738007224,80.7969837316,81.3429092974,326.55338,44.791,2.8199,145.9,101.28,0.046752,0.046773,0.0066262,0.56424,0.14423,2.2382,0.034438,3.48788064,0.060762,216.57,0.080467,0.10004,0.065784,0.10962,0.016546,0.63961,0.6,0.414654673732,0.165861869493,0.16443,5.27738007224,0.0094229,0.0060918,0.017571,0.9,326.55338,0.0005,339,1,383.368339011,2.84798631515,2.8199,0.0193276216587,0.0149,0.1059,0.003,0.0148,90000,1.4462660088,80.7969837316,81.3429092974,6.58878876028,0\nadolescent#004,4,0,0,0,248.11709,214.758607646,4.31676536,0,108.88,108.88,3.95608314762,97.383030189,124.746856854,248.11709,49.564,3.2437,144.7,108.88,0.14452,0.030833,0.0096077,0.77607,0.14467,1.7147,0.039647,4.31676536,0.056525,248.78,0.07298,0.072211,0.037027,0.17822,0.02182,0.80238,0.6,0.408322597923,0.163329039169,0.26733,3.95608314762,0.0058346,0.0046256,0.015157,0.9,248.11709,0.0005,339,1,214.758607646,4.84283999312,3.2437,0.0224167242571,0.0155,0.0751,0.0026,0.0121,90000,1.76263284642,97.383030189,124.746856854,6.0416845715,0\nadolescent#005,5,0,0,0,279.047113,144.715758769,5.16289777,0,113.09,113.09,4.63464033793,83.8603979178,71.5419213875,279.047113,47.074,2.8283,139.03,113.09,1.2323,0.025659,0.025281,0.98829,0.13898,2.0071,0.045653,5.16289777,0.050384,278.74,0.14022,0.079271,0.032703,0.13245,0.014914,0.6388,0.6,0.297244948528,0.118897979411,0.198675,4.63464033793,0.010166,0.0039814,0.0062157,0.9,279.047113,0.0005,339,1,144.715758769,5.34982624105,2.8283,0.0203430914191,0.0151,0.0866,0.0032,0.0177,90000,1.5346452819,83.8603979178,71.5419213875,4.6422316887,0\nadolescent#006,6,0,0,0,257.421705,162.558570565,8.154419,0,113.0,113.0,1.7150416755,79.9949521754,52.7439245113,257.421705,45.408,3.792,134.67,113.0,0.044109,0.058757,0.0075623,0.62856,0.17249,1.9115,0.072163,8.154419,0.043789,205.67,0.084141,0.06398,0.046778,0.44964,0.021571,0.7747,0.6,0.236421300822,0.0945685203288,0.67446,1.7150416755,0.044238,0.012289,0.0062812,0.9,257.421705,0.0005,339,1,162.558570565,6.32445379807,3.792,0.0281577188683,0.018,0.0737,0.0061,0.0273,90000,1.92787834743,79.9949521754,52.7439245113,7.66523093275,0\nadolescent#007,7,0,0,0,238.918844,87.9615903151,5.2342344,0,111.9,111.9,4.7237153349,94.4307701512,88.4032741841,238.918844,37.898,3.0324,145.16,111.9,0.053959,0.046226,0.0083388,0.63139,0.17323,1.6459,0.046776,5.2342344,0.03753,213.24,0.15372,0.065101,0.028587,0.17352,0.017336,0.694,0.6,0.391489481686,0.156595792674,0.26028,4.7237153349,0.0058301,0.0096939,0.0095992,0.9,238.918844,0.0005,339,1,87.9615903151,6.95942524417,3.0324,0.020890052356,0.0176,0.0503,0.0041,0.0188,90000,2.04914771228,94.4307701512,88.4032741841,6.42260586185,0\nadolescent#008,8,0,0,0,263.83812,33.9274151265,4.730160786,0,82.914,82.914,2.58030593927,64.7483947298,75.6122193488,263.83812,41.218,2.921,144.3,82.914,0.031127,0.051587,0.0085102,0.68583,0.13088,1.8284,0.057049,4.730160786,0.050245,216.9,0.2045,0.033578,0.024807,0.20978,0.0078171,0.67272,0.6,0.286087833178,0.114435133271,0.31467,2.58030593927,0.015816,0.0038941,0.0045499,0.9,263.83812,0.0005,339,1,33.9274151265,14.202068229,2.921,0.0202425502426,0.0174,0.0804,0.0035,0.0149,90000,1.35324144985,64.7483947298,75.6122193488,4.32566243169,0\nadolescent#009,9,0,0,0,241.4475,184.846172962,4.707832836,0,84.982,84.982,4.62123641991,71.2301660032,105.269360376,241.4475,43.885,4.2126,137.97,84.982,0.20973,0.027936,0.012496,0.87667,0.1589,1.75,0.055398,4.707832836,0.076427,223.83,0.080139,0.074658,0.035186,0.11961,0.028412,0.7136,0.6,0.29352469992,0.117409879968,0.179415,4.62123641991,0.0078732,0.014674,0.026073,0.9,241.4475,0.0005,339,1,184.846172962,7.10273332804,4.2126,0.0305327245053,0.0167,0.0912,0.0027,0.0113,90000,1.38186522046,71.2301660032,105.269360376,9.971336301,0\nadolescent#010,10,0,0,0,267.183741,169.7110728,6.32186544,0,108.24,108.24,3.58883085798,93.319683293,77.6764993884,267.183741,47.378,2.8311,144.87,108.24,0.80212,0.017759,0.010463,0.90795,0.26552,1.8443,0.058406,6.32186544,0.065509,231.53,0.13124,0.090215,0.038376,0.18514,0.024317,0.72708,0.6,0.262753198147,0.105101279259,0.27771,3.58883085798,0.010331,0.0028192,0.01386,0.9,267.183741,0.0005,339,1,169.7110728,4.32919618197,2.8311,0.0195423483123,0.0144,0.1045,0.0034,0.0173,90000,1.66109036262,93.319683293,77.6764993884,5.08455080263,0\nadult#001,1,0,0,0,265.370112,162.457097269,5.5043265,0,100.25,100.25,3.20762505142,72.4341762342,141.153779328,265.370112,102.32,2.2758,138.56,100.25,0.08906,0.046122,0.0037927,0.70391,0.21057,1.9152,0.054906,5.5043265,0.031319,253.52,0.087114,0.058138,0.027802,0.15446,0.027345,1.2642,0.6,0.225027424083,0.090010969633,0.23169,3.20762505142,0.0046374,0.00469,0.01208,0.9,265.370112,0.0005,339,1,162.457097269,3.2667306607,2.2758,0.0164246535797,0.0152,0.0766,0.0019,0.0078,90000,1.2386244136,72.4341762342,141.153779328,4.73140582528,0\nadult#002,2,0,0,0,228.74478,105.42424102,4.2367599,0,107.07,107.07,3.00055352824,65.2223493778,53.2999844378,228.74478,111.1,2.2639,136.45,107.07,0.021419,0.046859,0.0065141,0.62708,0.20388,1.6764,0.03957,4.2367599,0.041095,223.52,0.10712,0.054895,0.023888,0.16433,0.012082,1.2791,0.6,0.290954038543,0.116381615417,0.246495,3.00055352824,0.0029398,0.006551,0.010539,0.9,228.74478,0.0005,339,1,105.42424102,3.94361507564,2.2639,0.0165914254306,0.0152,0.1043,0.0037,0.0186,90000,1.23270240324,65.2223493778,53.2999844378,4.89081778378,0\nadult#003,3,0,0,0,273.07644,58.5083508878,4.7787333,0,131.45,131.45,4.76800378515,86.0119697596,89.3201224427,273.07644,81.631,2.7883,147.1,131.45,0.16971,0.042043,0.0056532,0.86326,0.20675,1.8564,0.036354,4.7787333,0.074874,244.83,0.22841,0.055487,0.037892,0.14648,0.01138,1.0843,0.6,0.365377784552,0.146151113821,0.21972,4.76800378515,0.016192,0.0025593,0.009496,0.9,273.07644,0.0005,339,1,58.5083508878,9.27149654129,2.7883,0.0189551325629,0.0162,0.0932,0.0041,0.0156,90000,1.74604298612,86.0119697596,89.3201224427,4.73543373289,0\nadult#004,42,0,0,0,284.241455193,206.107511651,6.64995399539,0,83.69716464,83.69716464,1.67041318173,57.5206305277,85.0483608517,284.241455193,63.0,2.986775436,150.6888823,83.69716464,0.080911441,0.058161342,0.00861298,0.637997241,0.092495502,1.886280201,0.07945256,6.64995399539,0.1086259,246.8818868,0.119405713,0.093572522,0.042193533,0.337462722,0.049867918,1.121391229,0.6,0.211919578527,0.0847678314109,0.506194083,1.67041318173,0.010115704,0.003087739,0.005633774,0.9,284.241455193,0.0005,339,1,206.107511651,4.36659587223,2.986775436,0.0198208082137,0.0207,0.0776,0.0038,0.014,90000,1.40925544793,57.5206305277,85.0483608517,4.33596977264,0\nadult#005,5,0,0,0,269.532164,85.3085339165,4.23964153,0,91.787,91.787,1.76058270751,67.0669032991,59.1299916661,269.532164,94.074,2.3574,142.67,91.787,0.039026,0.046023,0.0045175,0.7092,0.18486,1.8892,0.04619,4.23964153,0.024825,240.43,0.19683,0.067334,0.036957,0.28494,0.020251,1.2854,0.6,0.295815361468,0.118326144587,0.42741,1.76058270751,0.010603,0.0042297,0.0071329,0.9,269.532164,0.0005,339,1,85.3085339165,5.18303932372,2.3574,0.0165234457139,0.0149,0.0898,0.0038,0.0169,90000,1.25415109169,67.0669032991,59.1299916661,4.15214768637,0\nadult#006,6,0,0,0,261.839456,257.61167307,7.48715156,0,138.04,138.04,5.63793484811,169.421772684,174.84326941,261.839456,66.097,2.2226,135.64,138.04,0.58151,0.029515,0.014852,0.96206,0.1446,1.9304,0.054239,7.48715156,0.045288,188.77,0.070249,0.073784,0.053212,0.18511,0.029945,1.2493,0.6,0.348476356919,0.139390542768,0.277665,5.63793484811,0.011951,0.0026595,0.0046593,0.9,261.839456,0.0005,339,1,257.61167307,2.11848410047,2.2226,0.0163860218225,0.0129,0.0536,0.0025,0.0125,90000,2.60909529933,169.421772684,174.84326941,3.56213180523,0\nadult#007,7,0,0,0,249.82522,182.033173951,7.8531681,0,118.61,118.61,2.13475224365,83.519216599,94.8225692214,249.82522,91.229,2.8732,135.26,118.61,0.58034,0.032851,0.013232,0.93322,0.10058,1.847,0.06621,7.8531681,0.10286,212.78,0.11462,0.091015,0.04091,0.28169,0.050187,1.1563,0.6,0.19143177373,0.076572709492,0.422535,2.13475224365,0.01011,0.0024355,0.0069361,0.9,249.82522,0.0005,339,1,182.033173951,4.06279812296,2.8732,0.0212420523436,0.0151,0.0958,0.0029,0.0133,90000,1.50334589878,83.519216599,94.8225692214,4.30434014431,0\nadult#008,8,0,0,0,225.085945,142.685395142,6.7813815,0,106.1,106.1,2.68222815336,55.8011284167,51.2272654317,225.085945,102.79,2.8615,143.23,106.1,0.14058,0.024009,0.0048009,0.81105,0.17117,1.5715,0.063915,6.7813815,0.036819,264.01,0.065641,0.049881,0.035026,0.1656,0.034156,1.0758,0.6,0.163748707471,0.0654994829883,0.2484,2.68222815336,0.0049051,0.0080204,0.023879,0.9,225.085945,0.0005,339,1,142.685395142,5.30582318745,2.8615,0.0199783564896,0.0168,0.1519,0.0031,0.0183,90000,1.11044245549,55.8011284167,51.2272654317,7.20034121328,0\nadult#009,9,0,0,0,265.56894,73.3005106164,4.21939736,0,115.24,115.24,5.11019991428,73.7754104129,47.8945204697,265.56894,74.604,2.0874,145.08,115.24,0.21433,0.02187,0.0028379,0.76528,0.33742,1.8305,0.036614,4.21939736,0.016839,246.44,0.14598,0.044387,0.024128,0.11896,0.0070586,0.98387,0.6,0.360187326492,0.144074930597,0.17844,5.11019991428,0.0048098,0.0041804,0.0098864,0.9,265.56894,0.0005,339,1,73.3005106164,4.74329344121,2.0874,0.0143879239041,0.0161,0.1216,0.0045,0.0248,90000,1.51977345451,73.7754104129,47.8945204697,4.33689313278,0\nadult#010,10,0,0,0,317.320929,65.7778760652,4.413951432,0,92.373,92.373,3.44056216842,70.7300184239,67.3818518713,317.320929,73.859,2.3594,152.83,92.373,0.17966,0.039728,0.0091182,0.83824,0.13833,2.0763,0.047784,4.413951432,0.054346,246.13,0.1569,0.036808,0.016772,0.16035,0.023357,1.1028,0.6,0.31247180231,0.124988720924,0.240525,3.44056216842,0.008067,0.0034404,0.0048981,0.9,317.320929,0.0005,339,1,65.7778760652,6.44605134867,2.3594,0.0154380684421,0.0161,0.0893,0.0034,0.0169,90000,1.37923535927,70.7300184239,67.3818518713,3.90356311543,0\nchild#001,100,0,0,0,271.031853002,137.60135923,7.39593844866,0,110.3648078,110.3648078,1.45378246253,66.4071837276,35.7997574828,271.031853002,34.55648182,2.556787173,141.2046604,110.3648078,0.127494918,0.068714386,0.007997018,0.754915658,0.089529251,1.919425692,0.067013558,7.39593844866,0.152308243,185.8820726,0.128243663,0.070852519,0.042802541,0.314270832,0.047703625,0.35763698,0.6,0.154436596254,0.0617746385016,0.471406248,1.45378246253,0.010902381,0.002522654,0.008379266,0.9,271.031853002,0.0005,339,1,137.60135923,3.65981019497,2.556787173,0.0181069602502,0.0131,0.0684,0.0041,0.0243,90000,1.14220356012,66.4071837276,35.7997574828,4.1652828427,0\nchild#002,16,0,0,0,264.366111171,384.348662938,3.90569033089,0,104.3351578,104.3351578,2.72414938639,68.8906316382,96.4468842935,264.366111171,28.53257352,3.579170179,143.3925294,104.3351578,0.547271474,0.020390384,0.011239842,0.83267505,0.168209241,1.843653308,0.037434077,3.90569033089,0.062822379,225.7855513,0.067069068,0.107264417,0.067564011,0.203322432,0.020325939,0.378674876,0.6,0.354534430182,0.141813772073,0.304983648,2.72414938639,0.006425442,0.008198363,0.023930547,0.9,264.366111171,0.0005,339,1,384.348662938,4.09430322593,3.579170179,0.0249606460949,0.0168,0.0617,0.0033,0.012,90000,1.38470169593,68.8906316382,96.4468842935,8.24333692076,0\nchild#003,41,0,0,0,233.426051066,90.1365395679,5.59519238156,0,96.38653336,96.38653336,1.79509115018,26.8346975874,17.5645293299,233.426051066,41.23304017,2.167653937,133.8310731,96.38653336,0.099733323,0.053017395,0.006550925,0.595219309,0.119133938,1.744184259,0.058049524,5.59519238156,0.063997085,260.6177434,0.151559162,0.06352621,0.06520304,0.156066862,0.020572923,0.299616833,0.6,0.125176322684,0.0500705290734,0.234100293,1.79509115018,0.002815868,0.003133049,0.011524925,0.9,233.426051066,0.0005,339,1,90.1365395679,4.54376905737,2.167653937,0.0161969405669,0.018,0.0678,0.0081,0.0275,90000,0.70038560703,26.8346975874,17.5645293299,4.00983676085,0\nchild#004,61,0,0,0,276.767871791,340.969887233,7.52405238182,0,124.0496989,124.0496989,2.42440010999,67.2868436092,57.1763852431,276.767871791,35.5165043,2.366618286,133.7160874,124.0496989,0.233436885,0.030653413,0.016230469,0.778097629,0.095402818,2.069817306,0.060653532,7.52405238182,0.145715992,203.0817342,0.055357799,0.07313696,0.081707271,0.228693106,0.024671457,0.396855018,0.6,0.184223727854,0.0736894911417,0.343039659,2.42440010999,0.0074842,0.002691865,0.010417071,0.9,276.767871791,0.0005,339,1,340.969887233,2.18057641516,2.366618286,0.0176988299016,0.0164,0.1077,0.0042,0.0193,90000,1.38610897835,67.2868436092,57.1763852431,4.40387455417,0\nchild#005,62,0,0,0,256.487996958,92.9517456616,4.34091457232,0,119.291148,119.291148,1.89567530255,58.2559242046,57.6704375292,256.487996958,37.78855797,2.581818256,137.8702919,119.291148,0.330887558,0.013142286,0.012509418,0.960638488,0.201231635,1.860357249,0.036389243,4.34091457232,0.109076135,230.2404808,0.137397884,0.05596048,0.042999249,0.287641797,0.013546858,0.431825272,0.6,0.314032585456,0.125613034182,0.4314626955,1.89567530255,0.00697472,0.001989104,0.007058817,0.9,256.487996958,0.0005,339,1,92.9517456616,5.49996517414,2.581818256,0.0187264291706,0.0197,0.1244,0.0037,0.0199,90000,1.36318862639,58.2559242046,57.6704375292,3.93405394015,0\nchild#006,64,0,0,0,242.193130522,102.965023189,5.99228401573,0,100.4220798,100.4220798,1.70344929141,47.1524941769,39.6456294323,242.193130522,41.00214896,2.742872391,142.0005769,100.4220798,0.052654086,0.04693107,0.006665559,0.632999169,0.148305924,1.705578497,0.059670981,5.99228401573,0.081494569,238.0059149,0.116375837,0.056671769,0.067333073,0.231409795,0.050894003,0.402372567,0.6,0.164459349008,0.0657837396032,0.3471146925,1.70344929141,0.009870995,0.002702742,0.013575452,0.9,242.193130522,0.0005,339,1,102.965023189,5.77156024175,2.742872391,0.0193159242792,0.0169,0.0943,0.004,0.0201,90000,0.985487128297,47.1524941769,39.6456294323,4.76073306104,0\nchild#007,68,0,0,0,231.016602659,114.376709557,7.73719352451,0,104.4935749,104.4935749,1.42326269189,51.5538430194,59.1246870991,231.016602659,45.5397665,3.889183779,133.4001679,104.4935749,0.032863284,0.066365919,0.008004161,0.951778007,0.142843935,1.731756461,0.074044682,7.73719352451,0.073813859,225.0909871,0.104299715,0.064145355,0.043035605,0.288329479,0.049902688,0.447110978,0.6,0.132596072831,0.0530384291325,0.4324942185,1.42326269189,0.011469231,0.004102445,0.006996318,0.9,231.016602659,0.0005,339,1,114.376709557,8.57503740466,3.889183779,0.0291542644977,0.0164,0.0792,0.0035,0.0143,90000,1.02592147609,51.5538430194,59.1246870991,5.56798696445,0\nchild#008,88,0,0,0,307.226606718,74.4414259764,5.31506447574,0,100.6946287,100.6946287,2.63125641834,82.3409671628,119.914029849,307.226606718,23.73405728,2.89615241,151.3088739,100.6946287,0.125140051,0.042336118,0.007525726,0.62906403,0.212803068,2.030459938,0.052783992,5.31506447574,0.080044566,224.1030036,0.141265983,0.040400777,0.034704085,0.217802084,0.012471352,0.33769987,0.6,0.269560761712,0.107824304685,0.326703126,2.63125641834,0.008655602,0.004799275,0.010880209,0.9,307.226606718,0.0005,339,1,74.4414259764,7.60444513533,2.89615241,0.0191406646243,0.015,0.1064,0.0024,0.0103,90000,1.43273282863,82.3409671628,119.914029849,5.46619598839,0\nchild#009,89,0,0,0,260.782139377,378.358611322,5.4319759636,0,107.0898879,107.0898879,3.36507807403,54.5323874938,31.539253961,260.782139377,35.53392558,3.391235468,137.272603,107.0898879,0.163226227,0.067388647,0.013139851,0.808284982,0.134892405,1.899739159,0.050723519,5.4319759636,0.113583485,268.3161828,0.049496663,0.080982249,0.041367326,0.130939515,0.032686792,0.36551113,0.6,0.202790703559,0.0811162814237,0.1964092725,3.36507807403,0.012533054,0.015376442,0.01421148,0.9,260.782139377,0.0005,339,1,378.358611322,4.08700015724,3.391235468,0.0247043867013,0.0155,0.0888,0.0047,0.0268,90000,1.10155422738,54.5323874938,31.539253961,8.92304270886,0\nchild#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.2945301,2.3252309291,60.0485027983,54.4625955612,247.420085943,35.21305847,3.376363824,136.4151774,105.2945301,0.217656178,0.036428394,0.019217714,0.678361137,0.097283767,1.813728433,0.062384755,6.56877346313,0.09197894,226.4829255,0.102776369,0.058760479,0.036427048,0.194202105,0.03026706,0.377535652,0.6,0.171860372251,0.0687441489005,0.2913031575,2.3252309291,0.007965987,0.003572135,0.005341234,0.9,247.420085943,0.0005,339,1,118.336141455,6.92447418397,3.376363824,0.0247506464336,0.0156,0.0947,0.0032,0.0172,90000,1.12891185261,60.0485027983,54.4625955612,4.82258449688,0\n";
+    const BASE_CONFIG_TEMPLATE = {"patient_name": "adult#001", "dt_min": 1.0, "tsteps": 720, "meal_schedule": [{"start_min": 60.0, "grams": 60.0, "eat_rate_g_per_min": 5.0}, {"start_min": 180.0, "grams": 110.0, "eat_rate_g_per_min": 15.0}, {"start_min": 300.0, "grams": 60.0, "eat_rate_g_per_min": 10.0}, {"start_min": 360.0, "grams": 30.0, "eat_rate_g_per_min": 3.0}, {"start_min": 520.0, "grams": 160.0, "eat_rate_g_per_min": 15.0}, {"start_min": 630.0, "grams": 90.0, "eat_rate_g_per_min": 5.0}], "cost": {"target_gsub": 125.0, "q_gsub": 10.0, "r_insulin": 1.0}, "ilqr": {"step_size": 0.1, "max_iters": 10, "max_insulin": 0.5, "q_epsilon": 1e-06}, "initial_state": [0.0, 0.0, 0.0, 265.370112, 162.457097269, 5.5043265, 0.0, 100.25, 100.25, 3.20762505142, 72.4341762342, 141.153779328, 265.370112], "params": {"BW": 102.32, "u2ss": 1.2386244136, "kmax": 0.046122, "kmin": 0.0037927, "b": 0.70391, "d": 0.21057, "kabs": 0.08906, "f": 0.9, "kp1": 4.73140582528, "kp2": 0.00469, "kp3": 0.01208, "Fsnc": 1.0, "ke1": 0.0005, "ke2": 339.0, "k1": 0.058138, "k2": 0.087114, "Vm0": 3.2667306607, "Vmx": 0.031319, "Km0": 253.52, "m1": 0.15446, "m2": 0.225027424083, "m4": 0.090010969633, "m30": 0.23169, "ka1": 0.0019, "ka2": 0.0078, "kd": 0.0152, "Vi": 0.054906, "p2u": 0.027802, "Ib": 100.25, "ki": 0.0046374, "ksc": 0.0766, "Vg": 1.9152}, "demo": {"glucose_ylim_mgdl": [0, 300], "insulin_ylim_u_min": [-0.1, 0.6], "meal_ylim_g_min": [-1.0, 20.0]}};
+
+    const INITIAL_STATE_KEYS = [
+      'x0_1', 'x0_2', 'x0_3', 'x0_4', 'x0_5', 'x0_6', 'x0_7',
+      'x0_8', 'x0_9', 'x0_10', 'x0_11', 'x0_12', 'x0_13'
+    ];
+
+    const PARAM_KEYS = [
+      'BW', 'u2ss', 'kmax', 'kmin', 'b', 'd', 'kabs', 'f', 'kp1', 'kp2', 'kp3',
+      'Fsnc', 'ke1', 'ke2', 'k1', 'k2', 'Vm0', 'Vmx', 'Km0', 'm1', 'm2', 'm4',
+      'm30', 'ka1', 'ka2', 'kd', 'Vi', 'p2u', 'Ib', 'ki', 'ksc', 'Vg'
+    ];
+
+    const state = {
+      patientRows: [],
+      activeConfig: null,
+      sim: null,
+      speedup: Number(BASE_CONFIG_TEMPLATE.demo?.speedup ?? 30),
+      dataSource: 'loading',
+      repoStatus: 'Trying to read patient definitions from the simglucose repository…',
+      rafId: null,
+      lastFrameTs: null,
+    };
+
+    function deepClone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    function toNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function normalizeHeader(header) {
+      return String(header).replace(/\s+/g, '').trim();
+    }
+
+    function splitCsvLine(line) {
+      const out = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          out.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur);
+      return out;
+    }
+
+    function parseCsv(text) {
+      const lines = text.trim().split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+      const headers = splitCsvLine(lines[0]).map(normalizeHeader);
+      return lines.slice(1).map((line) => {
+        const values = splitCsvLine(line);
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] ?? '';
+        });
+        return row;
+      });
+    }
+
+    function buildConfigFromPatientRow(row) {
+      const cfg = deepClone(BASE_CONFIG_TEMPLATE);
+      cfg.patient_name = row.Name;
+      cfg.initial_state = INITIAL_STATE_KEYS.map((k) => toNumber(row[k]));
+      cfg.params = {};
+      for (const key of PARAM_KEYS) {
+        cfg.params[key] = toNumber(row[key]);
+      }
+      return cfg;
+    }
+
+    function groupPatientRows(rows) {
+      return {
+        adolescents: rows.filter(r => String(r.Name).startsWith('adolescent#')),
+        adults: rows.filter(r => String(r.Name).startsWith('adult#')),
+        children: rows.filter(r => String(r.Name).startsWith('child#')),
+      };
+    }
+
+    function fmt(value, digits = 2) {
+      return Number(value).toFixed(digits);
+    }
+
+    class T1DPatientModel {
+      constructor(config) {
+        this.config = config;
+        this.p = config.params;
+        this.dt = Number(config.dt_min);
+        this.tsteps = Number(config.tsteps);
+        this.stateDim = 16;
+        this.initialStatePhys = config.initial_state.map(Number);
+      }
+
+      makeInitialAugState(x0Phys) {
+        const lastQsto0 = x0Phys[0] + x0Phys[1];
+        const lastFoodTaken0 = 0.0;
+        const prevCho0 = 0.0;
+        return [...x0Phys, lastQsto0, lastFoodTaken0, prevCho0];
+      }
+
+      unpack(s) {
+        return {
+          x: s.slice(0, 13),
+          lastQsto: s[13],
+          lastFoodTaken: s[14],
+          prevCho: s[15],
+        };
+      }
+
+      pack(x, lastQsto, lastFoodTaken, prevCho) {
+        return [...x, lastQsto, lastFoodTaken, prevCho];
+      }
+
+      dyn(s, insulinUMin, choGMin) {
+        const { x, lastQsto, lastFoodTaken } = this.unpack(s);
+        const p = this.p;
+        const dMgMin = choGMin * 1000.0;
+        const insulinPmolKgMin = insulinUMin * 6000.0 / p.BW;
+
+        const qsto = x[0] + x[1];
+        const dbar = lastQsto + 1000.0 * lastFoodTaken;
+        const dbarSafe = dbar > 0.0 ? dbar : 1.0;
+        const aa = 5.0 / (2.0 * dbarSafe * (1.0 - p.b));
+        const cc = 5.0 / (2.0 * dbarSafe * p.d);
+        const kgutCandidate = p.kmin + 0.5 * (p.kmax - p.kmin) * (
+          Math.tanh(aa * (qsto - p.b * dbarSafe)) -
+          Math.tanh(cc * (qsto - p.d * dbarSafe)) + 2.0
+        );
+        const kgut = dbar > 0.0 ? kgutCandidate : p.kmax;
+
+        const dx = new Array(16).fill(0.0);
+        dx[0] = -p.kmax * x[0] + dMgMin;
+        dx[1] = p.kmax * x[0] - kgut * x[1];
+        dx[2] = kgut * x[1] - p.kabs * x[2];
+
+        const rat = p.f * p.kabs * x[2] / p.BW;
+        const egpt = p.kp1 - p.kp2 * x[3] - p.kp3 * x[8];
+        const uiit = p.Fsnc;
+        const et = x[3] > p.ke2 ? p.ke1 * (x[3] - p.ke2) : 0.0;
+        const dx3Raw = Math.max(egpt, 0.0) + rat - uiit - et - p.k1 * x[3] + p.k2 * x[4];
+        dx[3] = x[3] >= 0.0 ? dx3Raw : 0.0;
+
+        const vmt = p.Vm0 + p.Vmx * x[6];
+        const uidt = vmt * x[4] / (p.Km0 + x[4]);
+        const dx4Raw = -uidt + p.k1 * x[3] - p.k2 * x[4];
+        dx[4] = x[4] >= 0.0 ? dx4Raw : 0.0;
+
+        const dx5Raw = -(p.m2 + p.m4) * x[5] + p.m1 * x[9] + p.ka1 * x[10] + p.ka2 * x[11];
+        dx[5] = x[5] >= 0.0 ? dx5Raw : 0.0;
+
+        const it = x[5] / p.Vi;
+        dx[6] = -p.p2u * x[6] + p.p2u * (it - p.Ib);
+        dx[7] = -p.ki * (x[7] - it);
+        dx[8] = -p.ki * (x[8] - x[7]);
+
+        const dx9Raw = -(p.m1 + p.m30) * x[9] + p.m2 * x[5];
+        dx[9] = x[9] >= 0.0 ? dx9Raw : 0.0;
+
+        const dx10Raw = insulinPmolKgMin - (p.ka1 + p.kd) * x[10];
+        dx[10] = x[10] >= 0.0 ? dx10Raw : 0.0;
+
+        const dx11Raw = p.kd * x[10] - p.ka2 * x[11];
+        dx[11] = x[11] >= 0.0 ? dx11Raw : 0.0;
+
+        const dx12Raw = -p.ksc * x[12] + p.ksc * x[3];
+        dx[12] = x[12] >= 0.0 ? dx12Raw : 0.0;
+
+        return dx;
+      }
+
+      addScaled(a, b, scale) {
+        const out = new Array(a.length);
+        for (let i = 0; i < a.length; i += 1) out[i] = a[i] + scale * b[i];
+        return out;
+      }
+
+      updateMealBookkeeping(s, choGMin) {
+        const { x, lastQsto, lastFoodTaken, prevCho } = this.unpack(s);
+        const startsEating = choGMin > 0.0 && prevCho <= 0.0;
+        const newLastQsto = startsEating ? (x[0] + x[1]) : lastQsto;
+        const lastFoodBefore = startsEating ? 0.0 : lastFoodTaken;
+        const newLastFoodTaken = choGMin > 0.0 ? lastFoodBefore + choGMin * this.dt : lastFoodBefore;
+        return this.pack(x.slice(), newLastQsto, newLastFoodTaken, prevCho);
+      }
+
+      rk4Step(s, insulinUMin, choGMin) {
+        const dt = this.dt;
+        const k1 = this.dyn(s, insulinUMin, choGMin).map(v => dt * v);
+        const k2 = this.dyn(this.addScaled(s, k1, 0.5), insulinUMin, choGMin).map(v => dt * v);
+        const k3 = this.dyn(this.addScaled(s, k2, 0.5), insulinUMin, choGMin).map(v => dt * v);
+        const k4 = this.dyn(this.addScaled(s, k3, 1.0), insulinUMin, choGMin).map(v => dt * v);
+        const out = new Array(s.length);
+        for (let i = 0; i < s.length; i += 1) {
+          out[i] = s[i] + (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]) / 6.0;
+        }
+        return out;
+      }
+
+      step(s, insulinUMin, choGMin) {
+        const sPre = this.updateMealBookkeeping(s, choGMin);
+        const sInt = this.rk4Step(sPre, insulinUMin, choGMin);
+        const { x, lastQsto, lastFoodTaken } = this.unpack(sInt);
+        return this.pack(x, lastQsto, lastFoodTaken, choGMin);
+      }
+    }
+
+    class LiveT1DDemo {
+      constructor(config) {
+        this.config = config;
+        this.model = new T1DPatientModel(config);
+        this.Vg = Number(config.params.Vg);
+        this.targetGsub = Number(config.cost.target_gsub);
+        this.patientName = config.patient_name || 'T1D Patient';
+        this.maxInsulin = Number(config.demo?.max_insulin_u_min ?? config.ilqr?.max_insulin ?? 0.5);
+        this.windowMinutes = Number(config.demo?.window_minutes ?? 360.0);
+        this.sliderStep = Number(config.demo?.slider_step ?? 0.01);
+        this.defaultSpeedup = Number(config.demo?.speedup ?? 30.0);
+        this.simHorizonMin = Number(this.model.tsteps * this.model.dt);
+        this.glucoseYLim = config.demo?.glucose_ylim_mgdl ?? [40, 300];
+        this.insulinYLim = config.demo?.insulin_ylim_u_min ?? [0, this.maxInsulin];
+        const scheduledRates = (config.meal_schedule || []).map(m => Number(m.eat_rate_g_per_min || 0));
+        const defaultMealTop = scheduledRates.length ? Math.max(...scheduledRates) : 1.0;
+        this.mealYLim = config.demo?.meal_ylim_g_min ?? [0, Math.max(1.0, defaultMealTop * 1.1)];
+        this.reset();
+      }
+
+      reset() {
+        this.s = this.model.makeInitialAugState(this.model.initialStatePhys);
+        this.simTimeMin = 0.0;
+        this.paused = true;
+        this.finished = false;
+        this.currentInsulin = 0.0;
+        this.scheduledMeals = deepClone(this.config.meal_schedule || []);
+        this.pendingMeals = [];
+        this.eventLog = ['Simulation reset'];
+        this.tHist = [0.0];
+        this.glucoseHist = [this.glucoseFromState(this.s)];
+        this.insulinHist = [0.0];
+        this.choHist = [0.0];
+        this.accumulatorSec = 0.0;
+      }
+
+      glucoseFromState(s) {
+        return s[12] / this.Vg;
+      }
+
+      appendEvent(text) {
+        this.eventLog.push(text);
+        if (this.eventLog.length > 12) this.eventLog = this.eventLog.slice(-12);
+      }
+
+      scheduleExternalMeals() {
+        while (this.scheduledMeals.length && Number(this.scheduledMeals[0].start_min) <= this.simTimeMin + 1e-9) {
+          const meal = this.scheduledMeals.shift();
+          this.pendingMeals.push({
+            grams_remaining: Number(meal.grams),
+            eat_rate_g_per_min: Number(meal.eat_rate_g_per_min),
+          });
+          this.appendEvent(`Scheduled meal: ${Number(meal.grams).toFixed(0)} g at t = ${this.simTimeMin.toFixed(1)} min`);
+        }
+      }
+
+      consumePendingMeals() {
+        const dt = this.model.dt;
+        let totalChoGMin = 0.0;
+        const remainingMeals = [];
+        for (const meal of this.pendingMeals) {
+          const eatG = Math.min(meal.eat_rate_g_per_min * dt, meal.grams_remaining);
+          totalChoGMin += eatG / dt;
+          const remaining = meal.grams_remaining - eatG;
+          if (remaining > 1e-8) {
+            remainingMeals.push({ grams_remaining: remaining, eat_rate_g_per_min: meal.eat_rate_g_per_min });
+          }
+        }
+        this.pendingMeals = remainingMeals;
+        return totalChoGMin;
+      }
+
+      stepOnce() {
+        if (this.finished) return;
+        this.scheduleExternalMeals();
+        const choGMin = this.consumePendingMeals();
+        this.s = this.model.step(this.s, this.currentInsulin, choGMin);
+        this.simTimeMin += this.model.dt;
+        this.tHist.push(this.simTimeMin);
+        this.glucoseHist.push(this.glucoseFromState(this.s));
+        this.insulinHist.push(this.currentInsulin);
+        this.choHist.push(choGMin);
+
+        if (this.simTimeMin >= this.simHorizonMin - 1e-9) {
+          this.simTimeMin = this.simHorizonMin;
+          this.finished = true;
+          this.paused = true;
+          this.appendEvent('Simulation finished');
+        }
+      }
+
+      pendingChoTotal() {
+        return this.pendingMeals.reduce((sum, meal) => sum + meal.grams_remaining, 0.0);
+      }
+
+      statusLabel() {
+        if (this.finished) return 'Finished';
+        return this.paused ? 'Paused' : 'Running';
+      }
+    }
+
+    const els = {
+      patientSelect: document.getElementById('patientSelect'),
+      startPauseBtn: document.getElementById('startPauseBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      reloadRepoBtn: document.getElementById('reloadRepoBtn'),
+      insulinSlider: document.getElementById('insulinSlider'),
+      insulinValue: document.getElementById('insulinValue'),
+      speedSlider: document.getElementById('speedSlider'),
+      speedValue: document.getElementById('speedValue'),
+      dataSourceText: document.getElementById('dataSourceText'),
+      repoStatusText: document.getElementById('repoStatusText'),
+      dataSourcePill: document.getElementById('dataSourcePill'),
+      bwValue: document.getElementById('bwValue'),
+      u2ssValue: document.getElementById('u2ssValue'),
+      vgValue: document.getElementById('vgValue'),
+      statusValue: document.getElementById('statusValue'),
+      timeValue: document.getElementById('timeValue'),
+      glucoseValue: document.getElementById('glucoseValue'),
+      remainingValue: document.getElementById('remainingValue'),
+      targetValue: document.getElementById('targetValue'),
+      pendingChoValue: document.getElementById('pendingChoValue'),
+      eventsList: document.getElementById('eventsList'),
+      timeWindowLabel: document.getElementById('timeWindowLabel'),
+      insulinMaxLabel: document.getElementById('insulinMaxLabel'),
+      mealCountLabel: document.getElementById('mealCountLabel'),
+      glucoseCanvas: document.getElementById('glucoseCanvas'),
+      insulinCanvas: document.getElementById('insulinCanvas'),
+      mealCanvas: document.getElementById('mealCanvas'),
+    };
+
+    function setDataSource(source, extraText = '') {
+      state.dataSource = source;
+      if (source === 'repo') {
+        els.dataSourceText.textContent = 'Patient data: live GitHub repo';
+        els.dataSourcePill.style.background = '#ecfdf5';
+        els.dataSourcePill.style.color = '#166534';
+      } else if (source === 'fallback') {
+        els.dataSourceText.textContent = 'Patient data: embedded fallback snapshot';
+        els.dataSourcePill.style.background = '#fff7ed';
+        els.dataSourcePill.style.color = '#9a3412';
+      } else {
+        els.dataSourceText.textContent = 'Loading patient data…';
+        els.dataSourcePill.style.background = '#eef2ff';
+        els.dataSourcePill.style.color = '#3730a3';
+      }
+      if (extraText) {
+        state.repoStatus = extraText;
+        els.repoStatusText.textContent = extraText;
+      }
+    }
+
+    function populatePatientDropdown(rows, selectedName) {
+      const groups = groupPatientRows(rows);
+      els.patientSelect.innerHTML = '';
+      const order = [
+        ['Adolescents', groups.adolescents],
+        ['Adults', groups.adults],
+        ['Children', groups.children],
+      ];
+      for (const [label, items] of order) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = label;
+        for (const row of items) {
+          const option = document.createElement('option');
+          option.value = row.Name;
+          option.textContent = row.Name;
+          if (row.Name === selectedName) option.selected = true;
+          optgroup.appendChild(option);
+        }
+        els.patientSelect.appendChild(optgroup);
+      }
+    }
+
+    function loadPatientByName(name, preserveUi = true) {
+      const row = state.patientRows.find(r => r.Name === name) || state.patientRows[0];
+      if (!row) return;
+      const cfg = buildConfigFromPatientRow(row);
+      state.activeConfig = cfg;
+      state.sim = new LiveT1DDemo(cfg);
+      if (preserveUi) {
+        state.sim.currentInsulin = Number(els.insulinSlider.value);
+      }
+      els.insulinSlider.max = String(state.sim.maxInsulin);
+      els.insulinSlider.step = String(state.sim.sliderStep);
+      els.insulinSlider.value = '0';
+      state.sim.currentInsulin = 0.0;
+      els.insulinValue.textContent = '0.000 U/min';
+      els.insulinMaxLabel.textContent = `Max: ${fmt(state.sim.maxInsulin, 2)} U/min`;
+      els.timeWindowLabel.textContent = `Window: ${fmt(state.sim.windowMinutes, 0)} min`;
+      els.mealCountLabel.textContent = `${(cfg.meal_schedule || []).length} scheduled meals`;
+      els.bwValue.textContent = `${fmt(cfg.params.BW, 2)} kg`;
+      els.u2ssValue.textContent = `${fmt(cfg.params.u2ss, 3)} U/min`;
+      els.vgValue.textContent = `${fmt(cfg.params.Vg, 4)} dL/kg`;
+      els.startPauseBtn.textContent = 'Start';
+      updateUi();
+      drawAllCharts();
+    }
+
+    async function loadPatientsFromRepo() {
+      try {
+        setDataSource('loading', 'Reading patient definitions from the simglucose GitHub repository…');
+        const response = await fetch(REPO_CSV_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        const rows = parseCsv(text);
+        if (!rows.length) throw new Error('CSV parsed but no patient rows were found');
+        state.patientRows = rows;
+        setDataSource('repo', `Loaded ${rows.length} virtual patients from the simglucose repository.`);
+        const selected = state.activeConfig?.patient_name || BASE_CONFIG_TEMPLATE.patient_name || rows[0].Name;
+        populatePatientDropdown(rows, selected);
+        loadPatientByName(selected, false);
+      } catch (err) {
+        console.warn('Falling back to embedded patient snapshot:', err);
+        const rows = parseCsv(FALLBACK_CSV);
+        state.patientRows = rows;
+        setDataSource('fallback', 'Repo fetch failed, so the demo is using the embedded fallback snapshot of simglucose patient data.');
+        const selected = state.activeConfig?.patient_name || BASE_CONFIG_TEMPLATE.patient_name || rows[0].Name;
+        populatePatientDropdown(rows, selected);
+        loadPatientByName(selected, false);
+      }
+    }
+
+    function resizeCanvas(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(10, Math.floor(rect.width * dpr));
+      const height = Math.max(10, Math.floor(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return ctx;
+    }
+
+    function drawGrid(ctx, left, top, width, height, yMin, yMax, xMin, xMax) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(148,163,184,0.22)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      for (let i = 0; i <= 4; i += 1) {
+        const y = top + (i / 4) * height;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + width, y);
+        ctx.stroke();
+      }
+      for (let i = 0; i <= 6; i += 1) {
+        const x = left + (i / 6) * width;
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, top + height);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i <= 4; i += 1) {
+        const frac = i / 4;
+        const y = top + (1 - frac) * height;
+        const v = yMin + frac * (yMax - yMin);
+        ctx.fillText(fmt(v, 0), left - 8, y);
+      }
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (let i = 0; i <= 6; i += 1) {
+        const frac = i / 6;
+        const x = left + frac * width;
+        const v = xMin + frac * (xMax - xMin);
+        ctx.fillText(fmt(v, 0), x, top + height + 8);
+      }
+      ctx.restore();
+    }
+
+    function clipToWindow(t, y, xMin, xMax) {
+      const outT = [];
+      const outY = [];
+      for (let i = 0; i < t.length; i += 1) {
+        if (t[i] >= xMin - 1e-9 && t[i] <= xMax + 1e-9) {
+          outT.push(t[i]);
+          outY.push(y[i]);
+        }
+      }
+      if (!outT.length) {
+        outT.push(xMin, xMax);
+        outY.push(y[0] ?? 0, y[y.length - 1] ?? 0);
+      }
+      return { t: outT, y: outY };
+    }
+
+    function projectX(value, left, width, xMin, xMax) {
+      return left + ((value - xMin) / (xMax - xMin)) * width;
+    }
+
+    function projectY(value, top, height, yMin, yMax) {
+      return top + height - ((value - yMin) / (yMax - yMin)) * height;
+    }
+
+    function drawLineSeries(ctx, t, y, opts) {
+      const { left, top, width, height, xMin, xMax, yMin, yMax, color, lineWidth } = opts;
+      const clipped = clipToWindow(t, y, xMin, xMax);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      clipped.t.forEach((tv, idx) => {
+        const x = projectX(tv, left, width, xMin, xMax);
+        const yy = projectY(clipped.y[idx], top, height, yMin, yMax);
+        if (idx === 0) ctx.moveTo(x, yy);
+        else ctx.lineTo(x, yy);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawStepSeries(ctx, t, y, opts) {
+      const { left, top, width, height, xMin, xMax, yMin, yMax, color, lineWidth } = opts;
+      const clipped = clipToWindow(t, y, xMin, xMax);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < clipped.t.length; i += 1) {
+        const x = projectX(clipped.t[i], left, width, xMin, xMax);
+        const yy = projectY(clipped.y[i], top, height, yMin, yMax);
+        if (i === 0) {
+          ctx.moveTo(x, yy);
+        } else {
+          const prevX = projectX(clipped.t[i], left, width, xMin, xMax);
+          const prevY = projectY(clipped.y[i - 1], top, height, yMin, yMax);
+          ctx.lineTo(prevX, prevY);
+          ctx.lineTo(x, yy);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function chartWindow(sim) {
+      const xmaxTarget = sim.simHorizonMin;
+      const xmin = Math.max(0.0, Math.min(sim.simTimeMin - sim.windowMinutes, xmaxTarget - sim.windowMinutes));
+      let xmax = Math.min(xmaxTarget, Math.max(sim.windowMinutes, sim.simTimeMin + 5 * sim.model.dt));
+      let x0 = xmin;
+      if (xmax <= x0) xmax = Math.min(xmaxTarget, x0 + sim.windowMinutes);
+      if (xmax - x0 < 1e-6) xmax = x0 + 1;
+      return { xMin: x0, xMax: xmax };
+    }
+
+    function drawChartBase(canvas, yLabel) {
+      const ctx = resizeCanvas(canvas);
+      const rect = canvas.getBoundingClientRect();
+      const W = rect.width;
+      const H = rect.height;
+      ctx.clearRect(0, 0, W, H);
+      const padding = { left: 56, right: 16, top: 12, bottom: 34 };
+      const plot = {
+        left: padding.left,
+        top: padding.top,
+        width: W - padding.left - padding.right,
+        height: H - padding.top - padding.bottom,
+      };
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#dbe3ef';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(plot.left, plot.top, plot.width, plot.height);
+      ctx.save();
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.translate(16, plot.top + plot.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Simulation time [min]', plot.left + plot.width / 2, H - 8);
+      return { ctx, plot };
+    }
+
+    function drawGlucoseChart() {
+      if (!state.sim) return;
+      const sim = state.sim;
+      const { ctx, plot } = drawChartBase(els.glucoseCanvas, 'Glucose [mg/dL]');
+      const { xMin, xMax } = chartWindow(sim);
+      const yMin = sim.glucoseYLim[0];
+      const yMax = sim.glucoseYLim[1];
+
+      const safeTop = projectY(180, plot.top, plot.height, yMin, yMax);
+      const safeBottom = projectY(70, plot.top, plot.height, yMin, yMax);
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.14)';
+      ctx.fillRect(plot.left, safeTop, plot.width, safeBottom - safeTop);
+
+      drawGrid(ctx, plot.left, plot.top, plot.width, plot.height, yMin, yMax, xMin, xMax);
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(15,23,42,0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([6, 4]);
+      [70, 180].forEach(v => {
+        const y = projectY(v, plot.top, plot.height, yMin, yMax);
+        ctx.beginPath();
+        ctx.moveTo(plot.left, y);
+        ctx.lineTo(plot.left + plot.width, y);
+        ctx.stroke();
+      });
+      ctx.strokeStyle = '#111827';
+      const targetY = projectY(sim.targetGsub, plot.top, plot.height, yMin, yMax);
+      ctx.beginPath();
+      ctx.moveTo(plot.left, targetY);
+      ctx.lineTo(plot.left + plot.width, targetY);
+      ctx.stroke();
+      ctx.restore();
+
+      drawLineSeries(ctx, sim.tHist, sim.glucoseHist, {
+        left: plot.left, top: plot.top, width: plot.width, height: plot.height,
+        xMin, xMax, yMin, yMax, color: '#2563eb', lineWidth: 2.4,
+      });
+    }
+
+    function drawInsulinChart() {
+      if (!state.sim) return;
+      const sim = state.sim;
+      const { ctx, plot } = drawChartBase(els.insulinCanvas, 'Insulin [U/min]');
+      const { xMin, xMax } = chartWindow(sim);
+      const yMin = sim.insulinYLim[0];
+      const yMax = sim.insulinYLim[1];
+      drawGrid(ctx, plot.left, plot.top, plot.width, plot.height, yMin, yMax, xMin, xMax);
+      drawStepSeries(ctx, sim.tHist, sim.insulinHist, {
+        left: plot.left, top: plot.top, width: plot.width, height: plot.height,
+        xMin, xMax, yMin, yMax, color: '#7c3aed', lineWidth: 2.2,
+      });
+    }
+
+    function drawMealChart() {
+      if (!state.sim) return;
+      const sim = state.sim;
+      const { ctx, plot } = drawChartBase(els.mealCanvas, 'CHO [g/min]');
+      const { xMin, xMax } = chartWindow(sim);
+      const yMin = sim.mealYLim[0];
+      const yMax = sim.mealYLim[1];
+      drawGrid(ctx, plot.left, plot.top, plot.width, plot.height, yMin, yMax, xMin, xMax);
+      drawStepSeries(ctx, sim.tHist, sim.choHist, {
+        left: plot.left, top: plot.top, width: plot.width, height: plot.height,
+        xMin, xMax, yMin, yMax, color: '#dc2626', lineWidth: 2.0,
+      });
+    }
+
+    function drawAllCharts() {
+      drawGlucoseChart();
+      drawInsulinChart();
+      drawMealChart();
+    }
+
+    function updateUi() {
+      if (!state.sim) return;
+      const sim = state.sim;
+      els.statusValue.textContent = sim.statusLabel();
+      els.timeValue.textContent = `${fmt(sim.simTimeMin, 1)} min`;
+      els.glucoseValue.textContent = `${fmt(sim.glucoseHist[sim.glucoseHist.length - 1], 2)} mg/dL`;
+      els.remainingValue.textContent = `${fmt(Math.max(0, sim.simHorizonMin - sim.simTimeMin), 1)} min`;
+      els.targetValue.textContent = `${fmt(sim.targetGsub, 2)} mg/dL`;
+      els.pendingChoValue.textContent = `${fmt(sim.pendingChoTotal(), 2)} g`;
+      els.eventsList.innerHTML = '';
+      [...sim.eventLog].slice(-8).reverse().forEach(text => {
+        const div = document.createElement('div');
+        div.className = 'event';
+        div.textContent = text;
+        els.eventsList.appendChild(div);
+      });
+      if (sim.finished) {
+        els.startPauseBtn.textContent = 'Finished';
+      } else {
+        els.startPauseBtn.textContent = sim.paused ? 'Start' : 'Pause';
+      }
+    }
+
+    function animationLoop(ts) {
+      if (state.lastFrameTs == null) state.lastFrameTs = ts;
+      const elapsedSec = (ts - state.lastFrameTs) / 1000.0;
+      state.lastFrameTs = ts;
+      const sim = state.sim;
+      if (sim && !sim.paused && !sim.finished) {
+        const wallStep = sim.model.dt / Math.max(1, state.speedup);
+        sim.accumulatorSec += elapsedSec;
+        let guard = 0;
+        while (sim.accumulatorSec >= wallStep && guard < 240 && !sim.paused && !sim.finished) {
+          sim.accumulatorSec -= wallStep;
+          sim.stepOnce();
+          guard += 1;
+        }
+      }
+      updateUi();
+      drawAllCharts();
+      state.rafId = requestAnimationFrame(animationLoop);
+    }
+
+    function bindEvents() {
+      els.patientSelect.addEventListener('change', () => {
+        loadPatientByName(els.patientSelect.value, false);
+      });
+
+      els.startPauseBtn.addEventListener('click', () => {
+        if (!state.sim) return;
+        if (state.sim.finished) return;
+        state.sim.paused = !state.sim.paused;
+        updateUi();
+      });
+
+      els.resetBtn.addEventListener('click', () => {
+        if (!state.sim) return;
+        state.sim.reset();
+        state.sim.currentInsulin = 0.0;
+        els.insulinSlider.value = '0';
+        els.insulinValue.textContent = '0.000 U/min';
+        updateUi();
+        drawAllCharts();
+      });
+
+      els.reloadRepoBtn.addEventListener('click', async () => {
+        await loadPatientsFromRepo();
+      });
+
+      els.insulinSlider.addEventListener('input', () => {
+        const value = Number(els.insulinSlider.value);
+        els.insulinValue.textContent = `${fmt(value, 3)} U/min`;
+        if (state.sim) state.sim.currentInsulin = value;
+      });
+
+      els.speedSlider.value = String(state.speedup);
+      els.speedValue.textContent = `${state.speedup}×`;
+      els.speedSlider.addEventListener('input', () => {
+        state.speedup = Number(els.speedSlider.value);
+        els.speedValue.textContent = `${state.speedup}×`;
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (!state.sim) return;
+        const step = Number(els.insulinSlider.step || state.sim.sliderStep || 0.01);
+        const max = Number(els.insulinSlider.max || state.sim.maxInsulin || 0.5);
+        const current = Number(els.insulinSlider.value);
+        if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
+          const next = Math.min(max, current + step);
+          els.insulinSlider.value = String(next);
+          els.insulinSlider.dispatchEvent(new Event('input'));
+          event.preventDefault();
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
+          const next = Math.max(0, current - step);
+          els.insulinSlider.value = String(next);
+          els.insulinSlider.dispatchEvent(new Event('input'));
+          event.preventDefault();
+        } else if (event.key === ' ' || event.code === 'Space') {
+          if (!state.sim.finished) state.sim.paused = !state.sim.paused;
+          updateUi();
+          event.preventDefault();
+        } else if (event.key === 'r' || event.key === 'R') {
+          state.sim.reset();
+          state.sim.currentInsulin = 0.0;
+          els.insulinSlider.value = '0';
+          els.insulinSlider.dispatchEvent(new Event('input'));
+          updateUi();
+          drawAllCharts();
+          event.preventDefault();
+        }
+      });
+
+      window.addEventListener('resize', drawAllCharts);
+    }
+
+    async function init() {
+      bindEvents();
+      await loadPatientsFromRepo();
+      state.lastFrameTs = null;
+      state.rafId = requestAnimationFrame(animationLoop);
+    }
+
+    init();
+  </script>
+</body>
+</html>
