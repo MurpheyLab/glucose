@@ -88,7 +88,7 @@
       display: grid;
       grid-template-columns: minmax(0, 1.9fr) minmax(300px, 0.9fr);
       gap: 16px;
-      align-items: stretch;
+      align-items: start;
       flex: 1;
       min-height: 0;
     }
@@ -104,24 +104,35 @@
     .charts-panel {
       padding: 12px;
       min-height: 0;
+      overflow: hidden;
+      align-self: start;
+    }
+
+    .charts-scroll {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 0;
+      scrollbar-gutter: stable both-edges;
     }
 
     .charts-grid {
       display: grid;
-      grid-template-rows: 1.5fr 0.82fr 0.82fr;
-      gap: 10px;
-      height: min(74vh, calc(100vh - 150px));
-      min-height: 540px;
+      grid-template-rows: 1.6fr 0.98fr 0.98fr;
+      gap: 8px;
+      height: min(74vh, calc(100vh - 170px));
+      min-height: 580px;
+      min-width: 100%;
     }
 
     .chart-card {
       border: 1px solid var(--border);
       border-radius: 16px;
       background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-      padding: 10px 12px 8px 12px;
+      padding: 8px 10px 6px 10px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       min-height: 0;
     }
 
@@ -400,7 +411,7 @@
       }
       .charts-grid {
         height: auto;
-        min-height: 640px;
+        min-height: 540px;
       }
       .controls-panel {
         position: static;
@@ -416,7 +427,7 @@
       .patient-meta { grid-template-columns: 1fr; }
       .charts-grid {
         height: auto;
-        min-height: 620px;
+        min-height: 520px;
       }
       .hero { flex-direction: column; }
     }
@@ -428,7 +439,7 @@
       <div>
         <h1>T1D Human-Controlled Insulin Demo</h1>
         <p>
-          A single-file browser demo that mirrors the 13-state simglucose-style patient model, lets you manually control basal insulin,
+          An interactive demo of glucose regulation based on the <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4454102/">FDA-approved UVa/Padova Simulator</a>, originally implemented in <a href="simglucose">simglucose</a>. It allows manual control of basal insulin,
           and loads virtual patients from the simglucose repository at runtime when available.
         </p>
         <div class="badge-row">
@@ -443,8 +454,9 @@
 
     <div class="layout">
       <div class="panel charts-panel">
-        <div class="charts-grid">
-          <div class="chart-card">
+        <div class="charts-scroll" id="chartsScroll">
+          <div class="charts-grid" id="chartsGrid">
+            <div class="chart-card">
             <div class="chart-top">
               <div>
                 <div class="chart-title">Glucose trace</div>
@@ -471,15 +483,16 @@
             <canvas id="insulinCanvas"></canvas>
           </div>
 
-          <div class="chart-card">
-            <div class="chart-top">
-              <div>
-                <div class="chart-title">Meal intake</div>
-                <div class="chart-subtitle">Scheduled carbohydrate consumption from the demo config</div>
+            <div class="chart-card">
+              <div class="chart-top">
+                <div>
+                  <div class="chart-title">Meal intake</div>
+                  <div class="chart-subtitle" id="mealSubtitle">Random carbohydrate schedule</div>
+                </div>
+                <div class="chart-subtitle" id="mealCountLabel">6 scheduled meals</div>
               </div>
-              <div class="chart-subtitle" id="mealCountLabel">6 scheduled meals</div>
+              <canvas id="mealCanvas"></canvas>
             </div>
-            <canvas id="mealCanvas"></canvas>
           </div>
         </div>
       </div>
@@ -492,6 +505,10 @@
               <label for="patientSelect">Virtual patient</label>
               <select id="patientSelect"></select>
             </div>
+            <div>
+              <label for="simHoursInput">Simulation length [hours]</label>
+              <input id="simHoursInput" type="number" min="1" max="48" step="0.5" value="12" />
+            </div>
             <div class="button-row">
               <button id="startPauseBtn" class="primary">Start</button>
               <button id="resetBtn" class="secondary">Reset</button>
@@ -502,7 +519,7 @@
 
           <div class="patient-meta">
             <div class="mini"><div class="k">Body weight</div><div class="v" id="bwValue">—</div></div>
-            <div class="mini"><div class="k">Basal steady insulin</div><div class="v" id="u2ssValue">—</div></div>
+            <div class="mini"><div class="k">Basal insulin</div><div class="v" id="u2ssValue">—</div></div>
             <div class="mini"><div class="k">Glucose volume</div><div class="v" id="vgValue">—</div></div>
           </div>
         </div>
@@ -527,6 +544,21 @@
         </div>
 
         <div class="section">
+          <h2>Meal schedule</h2>
+          <div class="form-grid">
+            <div>
+              <label for="mealSeedInput">Random seed</label>
+              <input id="mealSeedInput" type="number" min="0" step="1" value="1" />
+            </div>
+            <div class="button-row" style="grid-template-columns: repeat(2, 1fr);">
+              <button id="applyMealBtn" class="secondary">Apply random meals</button>
+              <button id="regenerateMealBtn" class="ghost">New random day</button>
+            </div>
+            <p id="mealScenarioText">Random meals follow simglucose-style breakfast/snack/lunch/snack/dinner/snack windows on a virtual day that starts at 06:00 for this demo.</p>
+          </div>
+        </div>
+
+        <div class="section">
           <h2>Live metrics</h2>
           <div class="metrics">
             <div class="metric"><div class="metric-label">Status</div><div class="metric-value" id="statusValue">Paused</div></div>
@@ -546,7 +578,7 @@
         <div class="section">
           <h2>Notes</h2>
           <div class="footer-note">
-            The patient dropdown is built from simglucose patient rows. The meal schedule, plotting ranges, target glucose, and demo-level UI defaults come from your provided converted config.
+            The patient dropdown is built from simglucose patient rows. Meals now always use simglucose-style daily random sampling and are converted into the gradual-eating schedule used by this browser demo.
           </div>
         </div>
       </div>
@@ -574,6 +606,9 @@
       activeConfig: null,
       sim: null,
       speedup: Number(BASE_CONFIG_TEMPLATE.demo?.speedup ?? 30),
+      simHours: Math.max(1, Number(((BASE_CONFIG_TEMPLATE.tsteps * BASE_CONFIG_TEMPLATE.dt_min) / 60).toFixed(1)) || 12),
+      mealSeed: 1,
+      randomMealDayStartHour: 6,
       dataSource: 'loading',
       repoStatus: 'Trying to read patient definitions from the simglucose repository…',
       rafId: null,
@@ -591,6 +626,39 @@
 
     function normalizeHeader(header) {
       return String(header).replace(/\s+/g, '').trim();
+    }
+
+    function clamp(value, lo, hi) {
+      return Math.min(hi, Math.max(lo, value));
+    }
+
+    function mulberry32(seed) {
+      let a = (seed >>> 0) || 1;
+      return function rng() {
+        a |= 0;
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function sampleNormal(rng, mean = 0, sigma = 1) {
+      let u1 = 0;
+      let u2 = 0;
+      while (u1 <= Number.EPSILON) u1 = rng();
+      while (u2 <= Number.EPSILON) u2 = rng();
+      const mag = Math.sqrt(-2.0 * Math.log(u1));
+      const z0 = mag * Math.cos(2.0 * Math.PI * u2);
+      return mean + sigma * z0;
+    }
+
+    function sampleTruncNormal(rng, lb, ub, mean, sigma) {
+      for (let i = 0; i < 128; i += 1) {
+        const candidate = sampleNormal(rng, mean, sigma);
+        if (candidate >= lb && candidate <= ub) return candidate;
+      }
+      return clamp(mean, lb, ub);
     }
 
     function splitCsvLine(line) {
@@ -639,6 +707,51 @@
       for (const key of PARAM_KEYS) {
         cfg.params[key] = toNumber(row[key]);
       }
+      return cfg;
+    }
+
+    function makeRandomMealSchedule(seed, simHorizonMin, startHour = 6) {
+      const rng = mulberry32(Math.floor(Number(seed) || 0) + 1);
+      const slotDefs = [
+        { name: 'Breakfast', prob: 0.95, timeLb: 5 * 60, timeUb: 9 * 60, timeMu: 7 * 60, timeSigma: 60, amountMu: 45, amountSigma: 10, durationMin: 12 },
+        { name: 'Snack 1', prob: 0.30, timeLb: 9 * 60, timeUb: 10 * 60, timeMu: 9.5 * 60, timeSigma: 30, amountMu: 10, amountSigma: 5, durationMin: 5 },
+        { name: 'Lunch', prob: 0.95, timeLb: 10 * 60, timeUb: 14 * 60, timeMu: 12 * 60, timeSigma: 60, amountMu: 70, amountSigma: 10, durationMin: 12 },
+        { name: 'Snack 2', prob: 0.30, timeLb: 14 * 60, timeUb: 16 * 60, timeMu: 15 * 60, timeSigma: 30, amountMu: 10, amountSigma: 5, durationMin: 5 },
+        { name: 'Dinner', prob: 0.95, timeLb: 16 * 60, timeUb: 20 * 60, timeMu: 18 * 60, timeSigma: 60, amountMu: 80, amountSigma: 10, durationMin: 12 },
+        { name: 'Snack 3', prob: 0.30, timeLb: 20 * 60, timeUb: 23 * 60, timeMu: 21.5 * 60, timeSigma: 30, amountMu: 10, amountSigma: 5, durationMin: 5 },
+      ];
+      const startOffsetMin = startHour * 60;
+      const out = [];
+      for (const slot of slotDefs) {
+        if (rng() >= slot.prob) continue;
+        const absoluteT = Math.round(sampleTruncNormal(rng, slot.timeLb, slot.timeUb, slot.timeMu, slot.timeSigma));
+        const relativeT = absoluteT - startOffsetMin;
+        const grams = Math.max(Math.round(sampleNormal(rng, slot.amountMu, slot.amountSigma)), 0);
+        if (grams <= 0) continue;
+        if (relativeT < 0 || relativeT >= simHorizonMin) continue;
+        const eatRate = clamp(grams / slot.durationMin, 1.5, 20.0);
+        out.push({
+          start_min: relativeT,
+          grams,
+          eat_rate_g_per_min: Number(eatRate.toFixed(3)),
+          slot_name: slot.name,
+          absolute_clock_min: absoluteT,
+        });
+      }
+      out.sort((a, b) => a.start_min - b.start_min);
+      return out;
+    }
+
+    function applyMealScheduleToConfig(cfg) {
+      const simHorizonMin = cfg.tsteps * cfg.dt_min;
+      const schedule = makeRandomMealSchedule(state.mealSeed, simHorizonMin, state.randomMealDayStartHour);
+      cfg.meal_schedule = schedule;
+      cfg.meal_mode = 'random';
+      cfg.meal_seed = state.mealSeed;
+      cfg.demo = cfg.demo || {};
+      const maxRate = schedule.length ? Math.max(...schedule.map(m => Number(m.eat_rate_g_per_min || 0))) : 1.0;
+      const lower = Array.isArray(cfg.demo.meal_ylim_g_min) ? Number(cfg.demo.meal_ylim_g_min[0] ?? 0) : 0;
+      cfg.demo.meal_ylim_g_min = [lower, Math.max(12.0, Math.ceil(maxRate * 1.15))];
       return cfg;
     }
 
@@ -805,7 +918,10 @@
         this.currentInsulin = 0.0;
         this.scheduledMeals = deepClone(this.config.meal_schedule || []);
         this.pendingMeals = [];
-        this.eventLog = ['Simulation reset'];
+        const mealSummary = this.config.meal_mode === 'random'
+          ? `Random meals loaded (seed ${this.config.meal_seed ?? 0}, ${this.scheduledMeals.length} visible events)`
+          : `Fixed meal schedule loaded (${this.scheduledMeals.length} events)`;
+        this.eventLog = ['Simulation reset', mealSummary];
         this.tHist = [0.0];
         this.glucoseHist = [this.glucoseFromState(this.s)];
         this.insulinHist = [0.0];
@@ -902,7 +1018,15 @@
       eventsList: document.getElementById('eventsList'),
       timeWindowLabel: document.getElementById('timeWindowLabel'),
       insulinMaxLabel: document.getElementById('insulinMaxLabel'),
+      mealSubtitle: document.getElementById('mealSubtitle'),
+      mealSeedInput: document.getElementById('mealSeedInput'),
+      simHoursInput: document.getElementById('simHoursInput'),
+      applyMealBtn: document.getElementById('applyMealBtn'),
+      regenerateMealBtn: document.getElementById('regenerateMealBtn'),
+      mealScenarioText: document.getElementById('mealScenarioText'),
       mealCountLabel: document.getElementById('mealCountLabel'),
+      chartsScroll: document.getElementById('chartsScroll'),
+      chartsGrid: document.getElementById('chartsGrid'),
       glucoseCanvas: document.getElementById('glucoseCanvas'),
       insulinCanvas: document.getElementById('insulinCanvas'),
       mealCanvas: document.getElementById('mealCanvas'),
@@ -954,7 +1078,13 @@
     function loadPatientByName(name, preserveUi = true) {
       const row = state.patientRows.find(r => r.Name === name) || state.patientRows[0];
       if (!row) return;
-      const cfg = buildConfigFromPatientRow(row);
+      const cfgBase = buildConfigFromPatientRow(row);
+      const simHours = clamp(Number(state.simHours) || 12, 1, 48);
+      state.simHours = Number(simHours.toFixed(1));
+      cfgBase.tsteps = Math.max(1, Math.round((state.simHours * 60) / cfgBase.dt_min));
+      cfgBase.demo = cfgBase.demo || {};
+      cfgBase.demo.window_minutes = cfgBase.tsteps * cfgBase.dt_min;
+      const cfg = applyMealScheduleToConfig(cfgBase);
       state.activeConfig = cfg;
       state.sim = new LiveT1DDemo(cfg);
       if (preserveUi) {
@@ -966,12 +1096,20 @@
       state.sim.currentInsulin = 0.0;
       els.insulinValue.textContent = '0.000 U/min';
       els.insulinMaxLabel.textContent = `Max: ${fmt(state.sim.maxInsulin, 2)} U/min`;
-      els.timeWindowLabel.textContent = `Window: ${fmt(state.sim.windowMinutes, 0)} min`;
+      els.timeWindowLabel.textContent = `Horizon: ${fmt(cfg.tsteps * cfg.dt_min / 60, 1)} h • scroll to inspect`;
+      els.simHoursInput.value = String(state.simHours);
       els.mealCountLabel.textContent = `${(cfg.meal_schedule || []).length} scheduled meals`;
+      els.mealSubtitle.textContent = `Random meals from simglucose-style daily sampling (random seed: ${cfg.meal_seed})`;
+      els.mealSeedInput.value = String(state.mealSeed);
+      els.applyMealBtn.disabled = false;
+      els.regenerateMealBtn.disabled = false;
+      const totalCho = (cfg.meal_schedule || []).reduce((sum, meal) => sum + Number(meal.grams || 0), 0);
+      els.mealScenarioText.textContent = `Random day uses simglucose-style meal windows on a virtual day that starts at 06:00. Visible events in this ${fmt(cfg.tsteps * cfg.dt_min / 60, 1)} h demo: ${(cfg.meal_schedule || []).length}, total announced CHO ${fmt(totalCho, 0)} g.`;
       els.bwValue.textContent = `${fmt(cfg.params.BW, 2)} kg`;
       els.u2ssValue.textContent = `${fmt(cfg.params.u2ss, 3)} U/min`;
       els.vgValue.textContent = `${fmt(cfg.params.Vg, 4)} dL/kg`;
       els.startPauseBtn.textContent = 'Start';
+      syncChartGeometry(true);
       updateUi();
       drawAllCharts();
     }
@@ -1012,6 +1150,35 @@
       const ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       return ctx;
+    }
+
+    function syncChartGeometry(resetScroll = false) {
+      if (!els.chartsScroll || !els.chartsGrid) return;
+      const viewportWidth = Math.max(320, Math.floor(els.chartsScroll.clientWidth || els.chartsScroll.getBoundingClientRect().width || 0));
+      const horizonHours = Math.max(1, state.sim?.simHorizonMin ? state.sim.simHorizonMin / 60 : state.simHours || 12);
+      const pixelsPerHour = 220;
+      const contentWidth = Math.max(viewportWidth, Math.min(9600, Math.round(horizonHours * pixelsPerHour)));
+      els.chartsGrid.style.width = `${contentWidth}px`;
+      if (resetScroll) els.chartsScroll.scrollLeft = 0;
+    }
+
+    function followLatestTime(force = false) {
+      if (!state.sim || !els.chartsScroll || !els.chartsGrid) return;
+      const sim = state.sim;
+      const viewportWidth = Math.max(320, Math.floor(els.chartsScroll.clientWidth || els.chartsScroll.getBoundingClientRect().width || 0));
+      const contentWidth = Math.max(viewportWidth, Math.floor(els.chartsGrid.getBoundingClientRect().width || els.chartsGrid.scrollWidth || viewportWidth));
+      const maxScroll = Math.max(0, contentWidth - viewportWidth);
+      if (maxScroll <= 0) return;
+
+      const horizon = Math.max(sim.simHorizonMin, sim.model.dt);
+      const frac = clamp(sim.simTimeMin / horizon, 0, 1);
+      const currentX = frac * contentWidth;
+      const targetLeadFrac = force ? 0.5 : 0.82;
+      const desiredScroll = clamp(currentX - viewportWidth * targetLeadFrac, 0, maxScroll);
+
+      if (force || !sim.paused) {
+        els.chartsScroll.scrollLeft = desiredScroll;
+      }
     }
 
     function drawGrid(ctx, left, top, width, height, yMin, yMax, xMin, xMax) {
@@ -1126,13 +1293,22 @@
     }
 
     function chartWindow(sim) {
-      const xmaxTarget = sim.simHorizonMin;
-      const xmin = Math.max(0.0, Math.min(sim.simTimeMin - sim.windowMinutes, xmaxTarget - sim.windowMinutes));
-      let xmax = Math.min(xmaxTarget, Math.max(sim.windowMinutes, sim.simTimeMin + 5 * sim.model.dt));
-      let x0 = xmin;
-      if (xmax <= x0) xmax = Math.min(xmaxTarget, x0 + sim.windowMinutes);
-      if (xmax - x0 < 1e-6) xmax = x0 + 1;
-      return { xMin: x0, xMax: xmax };
+      const xMin = 0.0;
+      const xMax = Math.max(sim.simHorizonMin, sim.model.dt);
+      return { xMin, xMax };
+    }
+
+    function drawCurrentTimeMarker(ctx, plot, sim, xMin, xMax) {
+      const x = projectX(clamp(sim.simTimeMin, xMin, xMax), plot.left, plot.width, xMin, xMax);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(37,99,235,0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(x, plot.top);
+      ctx.lineTo(x, plot.top + plot.height);
+      ctx.stroke();
+      ctx.restore();
     }
 
     function drawChartBase(canvas, yLabel) {
@@ -1141,7 +1317,7 @@
       const W = rect.width;
       const H = rect.height;
       ctx.clearRect(0, 0, W, H);
-      const padding = { left: 56, right: 16, top: 12, bottom: 34 };
+      const padding = { left: 56, right: 16, top: 10, bottom: 28 };
       const plot = {
         left: padding.left,
         top: padding.top,
@@ -1202,6 +1378,7 @@
       ctx.stroke();
       ctx.restore();
 
+      drawCurrentTimeMarker(ctx, plot, sim, xMin, xMax);
       drawLineSeries(ctx, sim.tHist, sim.glucoseHist, {
         left: plot.left, top: plot.top, width: plot.width, height: plot.height,
         xMin, xMax, yMin, yMax, color: '#2563eb', lineWidth: 2.4,
@@ -1216,6 +1393,7 @@
       const yMin = sim.insulinYLim[0];
       const yMax = sim.insulinYLim[1];
       drawGrid(ctx, plot.left, plot.top, plot.width, plot.height, yMin, yMax, xMin, xMax);
+      drawCurrentTimeMarker(ctx, plot, sim, xMin, xMax);
       drawStepSeries(ctx, sim.tHist, sim.insulinHist, {
         left: plot.left, top: plot.top, width: plot.width, height: plot.height,
         xMin, xMax, yMin, yMax, color: '#7c3aed', lineWidth: 2.2,
@@ -1230,6 +1408,7 @@
       const yMin = sim.mealYLim[0];
       const yMax = sim.mealYLim[1];
       drawGrid(ctx, plot.left, plot.top, plot.width, plot.height, yMin, yMax, xMin, xMax);
+      drawCurrentTimeMarker(ctx, plot, sim, xMin, xMax);
       drawStepSeries(ctx, sim.tHist, sim.choHist, {
         left: plot.left, top: plot.top, width: plot.width, height: plot.height,
         xMin, xMax, yMin, yMax, color: '#dc2626', lineWidth: 2.0,
@@ -1237,6 +1416,7 @@
     }
 
     function drawAllCharts() {
+      syncChartGeometry(false);
       drawGlucoseChart();
       drawInsulinChart();
       drawMealChart();
@@ -1282,11 +1462,36 @@
       }
       updateUi();
       drawAllCharts();
+      followLatestTime(false);
       state.rafId = requestAnimationFrame(animationLoop);
     }
 
     function bindEvents() {
       els.patientSelect.addEventListener('change', () => {
+        loadPatientByName(els.patientSelect.value, false);
+      });
+
+      els.mealSeedInput.addEventListener('change', () => {
+        state.mealSeed = Math.max(0, Math.floor(Number(els.mealSeedInput.value) || 0));
+        els.mealSeedInput.value = String(state.mealSeed);
+        loadPatientByName(els.patientSelect.value, false);
+      });
+
+      els.simHoursInput.addEventListener('change', () => {
+        state.simHours = clamp(Number(els.simHoursInput.value) || 12, 1, 48);
+        els.simHoursInput.value = String(state.simHours);
+        loadPatientByName(els.patientSelect.value, false);
+      });
+
+      els.applyMealBtn.addEventListener('click', () => {
+        state.mealSeed = Math.max(0, Math.floor(Number(els.mealSeedInput.value) || 0));
+        els.mealSeedInput.value = String(state.mealSeed);
+        loadPatientByName(els.patientSelect.value, false);
+      });
+
+      els.regenerateMealBtn.addEventListener('click', () => {
+        state.mealSeed = Math.max(0, Math.floor(Number(els.mealSeedInput.value) || 0)) + 1;
+        els.mealSeedInput.value = String(state.mealSeed);
         loadPatientByName(els.patientSelect.value, false);
       });
 
@@ -1354,7 +1559,11 @@
         }
       });
 
-      window.addEventListener('resize', drawAllCharts);
+      window.addEventListener('resize', () => {
+        syncChartGeometry(false);
+        drawAllCharts();
+        followLatestTime(true);
+      });
     }
 
     async function init() {
