@@ -114,6 +114,13 @@
       overflow-y: hidden;
       padding-bottom: 0;
       scrollbar-gutter: stable both-edges;
+      cursor: grab;
+      overscroll-behavior-x: contain;
+      user-select: none;
+    }
+
+    .charts-scroll.dragging {
+      cursor: grabbing;
     }
 
     .charts-grid {
@@ -442,12 +449,12 @@
           An interactive demo of glucose regulation based on the <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4454102/">FDA-approved UVa/Padova Simulator</a>, originally implemented in <a href="simglucose">simglucose</a>. It allows manual control of basal insulin,
           and loads virtual patients from the simglucose repository at runtime when available.
         </p>
-        <div class="badge-row">
+        <!-- <div class="badge-row">
           <div class="badge">Single HTML file</div>
           <div class="badge">Repo-backed patient dropdown</div>
           <div class="badge">RK4 dynamics at 1 min timestep</div>
           <div class="badge">Local fallback snapshot included</div>
-        </div>
+        </div> -->
       </div>
       <div class="status-pill" id="dataSourcePill"><span class="status-dot"></span><span id="dataSourceText">Loading patient data…</span></div>
     </div>
@@ -613,6 +620,12 @@
       repoStatus: 'Trying to read patient definitions from the simglucose repository…',
       rafId: null,
       lastFrameTs: null,
+      dragPan: {
+        active: false,
+        startX: 0,
+        startScrollLeft: 0,
+        suppressAutoFollowUntilTs: 0,
+      },
     };
 
     function deepClone(obj) {
@@ -1165,6 +1178,8 @@
     function followLatestTime(force = false) {
       if (!state.sim || !els.chartsScroll || !els.chartsGrid) return;
       const sim = state.sim;
+      const now = performance.now();
+      if (!force && (state.dragPan.active || now < state.dragPan.suppressAutoFollowUntilTs)) return;
       const viewportWidth = Math.max(320, Math.floor(els.chartsScroll.clientWidth || els.chartsScroll.getBoundingClientRect().width || 0));
       const contentWidth = Math.max(viewportWidth, Math.floor(els.chartsGrid.getBoundingClientRect().width || els.chartsGrid.scrollWidth || viewportWidth));
       const maxScroll = Math.max(0, contentWidth - viewportWidth);
@@ -1445,6 +1460,49 @@
       }
     }
 
+
+    function bindChartDragPan() {
+      if (!els.chartsScroll) return;
+
+      const releaseDrag = () => {
+        if (!state.dragPan.active) return;
+        state.dragPan.active = false;
+        state.dragPan.suppressAutoFollowUntilTs = performance.now() + 1600;
+        els.chartsScroll.classList.remove('dragging');
+      };
+
+      els.chartsScroll.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        state.dragPan.active = true;
+        state.dragPan.startX = event.clientX;
+        state.dragPan.startScrollLeft = els.chartsScroll.scrollLeft;
+        state.dragPan.suppressAutoFollowUntilTs = performance.now() + 1600;
+        els.chartsScroll.classList.add('dragging');
+        if (typeof els.chartsScroll.setPointerCapture === 'function') {
+          els.chartsScroll.setPointerCapture(event.pointerId);
+        }
+        event.preventDefault();
+      });
+
+      els.chartsScroll.addEventListener('pointermove', (event) => {
+        if (!state.dragPan.active) return;
+        const dx = event.clientX - state.dragPan.startX;
+        els.chartsScroll.scrollLeft = state.dragPan.startScrollLeft - dx;
+        state.dragPan.suppressAutoFollowUntilTs = performance.now() + 1600;
+        event.preventDefault();
+      });
+
+      els.chartsScroll.addEventListener('pointerup', releaseDrag);
+      els.chartsScroll.addEventListener('pointercancel', releaseDrag);
+      els.chartsScroll.addEventListener('lostpointercapture', releaseDrag);
+      els.chartsScroll.addEventListener('mouseleave', (event) => {
+        if ((event.buttons & 1) === 0) releaseDrag();
+      });
+      els.chartsScroll.addEventListener('dragstart', (event) => {
+        event.preventDefault();
+      });
+    }
+
     function animationLoop(ts) {
       if (state.lastFrameTs == null) state.lastFrameTs = ts;
       const elapsedSec = (ts - state.lastFrameTs) / 1000.0;
@@ -1568,6 +1626,7 @@
 
     async function init() {
       bindEvents();
+      bindChartDragPan();
       await loadPatientsFromRepo();
       state.lastFrameTs = null;
       state.rafId = requestAnimationFrame(animationLoop);
