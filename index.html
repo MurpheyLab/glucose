@@ -162,6 +162,11 @@
             accent-color: var(--blue);
         }
 
+        .state-name {
+            min-width: 0;
+            font-weight: 700;
+        }
+
         .hint {
             color: var(--muted);
             font-size: 12px;
@@ -545,7 +550,7 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
                 this.basal = basal;
                 this.target = opts.target ?? 150;
                 this.horizon = opts.horizon ?? 120;
-                this.numSamples = opts.numSamples ?? 128;
+                this.numSamples = opts.numSamples ?? 96;
                 this.maxU = opts.maxU ?? INSULIN_MAX;
                 this.temperature = opts.temperature ?? 3.0;
                 this.noiseStd = opts.noiseStd ?? 0.022;
@@ -680,8 +685,9 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
             STATE_NAMES.forEach((name, idx) => {
                 const label = document.createElement('label'); label.className = 'state-row';
                 const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = selectedStates.has(idx);
+                const text = document.createElement('span'); text.className = 'state-name'; text.textContent = name; text.style.color = STATE_COLORS[idx % STATE_COLORS.length];
                 cb.addEventListener('change', () => { cb.checked ? selectedStates.add(idx) : selectedStates.delete(idx); drawAll(); });
-                label.appendChild(cb); label.appendChild(document.createTextNode(name)); els.stateList.appendChild(label);
+                label.appendChild(cb); label.appendChild(text); els.stateList.appendChild(label);
             });
         }
         function makeEnv(patientName) {
