@@ -263,6 +263,11 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
         const INSULIN_MIN = 0.0;
         const INSULIN_MAX = 0.1;
         const STEPS_PER_TICK = 10;
+        const MEAL_SIZE_SCALE_BY_PATIENT_TYPE = {
+            adult: 1.0,
+            adolescent: 0.8,
+            child: 0.55,
+        };
 
         function parseCsv(text) {
             const lines = text.trim().split(/\r?\n/);
@@ -300,6 +305,10 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
             const u2 = rand();
             return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
         }
+        function mealSizeScaleForPatient(patientName) {
+            const patientType = String(patientName).split('#')[0].toLowerCase();
+            return MEAL_SIZE_SCALE_BY_PATIENT_TYPE[patientType] ?? 1.0;
+        }
         function cholesky(matrix) {
             const n = matrix.length;
             const L = Array.from({ length: n }, () => new Float64Array(n));
@@ -336,8 +345,9 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
             }
             return out;
         }
-        function generateMealPlan(horizonMin, seed = 0) {
+        function generateMealPlan(horizonMin, seed = 0, mealSizeScale = 1.0) {
             const rand = mulberry32(seed);
+            mealSizeScale = Number(mealSizeScale);
             const windows = [
                 [60, 180, 40, 80, 4, 8],
                 [360, 480, 60, 110, 6, 12],
@@ -351,8 +361,8 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
                     const u0 = rand(), u1 = rand(), u2 = rand();
                     meals.push({
                         start_min: offset + t0 + (t1 - t0) * u0,
-                        grams: c0 + (c1 - c0) * u1,
-                        eat_rate_g_per_min: r0 + (r1 - r0) * u2,
+                        grams: (c0 + (c1 - c0) * u1) * mealSizeScale,
+                        eat_rate_g_per_min: (r0 + (r1 - r0) * u2) * mealSizeScale,
                     });
                 }
             }
@@ -487,7 +497,8 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
                 this.dt = DT;
                 this.params = patientRows.find(r => r.Name === patientName);
                 this.model = new GlucoseModel(this.params, this.dt);
-                this.mealPlan = generateMealPlan(this.horizon * this.dt, 0);
+                this.mealSizeScale = mealSizeScaleForPatient(patientName);
+                this.mealPlan = generateMealPlan(this.horizon * this.dt, 0, this.mealSizeScale);
                 this.choTraj = buildChoTraj(this.mealPlan, this.horizon, this.dt);
                 this.basal = this.params.u2ss * this.params.BW / 6000;
                 this.state0 = this.model.initialState();
@@ -533,8 +544,8 @@ child#010,100,0,0,0,247.420085943,118.336141455,6.56877346313,0,105.2945301,105.
                 this.choTraj = choTraj;
                 this.basal = basal;
                 this.target = opts.target ?? 150;
-                this.horizon = opts.horizon ?? 150;
-                this.numSamples = opts.numSamples ?? 32;
+                this.horizon = opts.horizon ?? 120;
+                this.numSamples = opts.numSamples ?? 128;
                 this.maxU = opts.maxU ?? INSULIN_MAX;
                 this.temperature = opts.temperature ?? 3.0;
                 this.noiseStd = opts.noiseStd ?? 0.022;
